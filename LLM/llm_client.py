@@ -73,7 +73,7 @@ class ClovaClient:
             content = content[len("```json"):]
         elif content.startswith("```"):
             content = content[len("```"):]
-            
+
         if content.endswith("```"):
             content = content[:-3]
 
@@ -81,7 +81,7 @@ class ClovaClient:
 
         return json.loads(content)
 
-    def detect_pii(
+    def detect_pii_llm(
         self,
         text: str,
     ) -> list[DetectedItem]:
