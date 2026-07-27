@@ -156,7 +156,8 @@ def test_download_returns_pdf(api, two_maskings):
 
     assert r.status_code == 200
     assert r.headers["content-type"] == "application/pdf"
-    assert len(r.content) > 0
+    # 프론트가 그대로 파일로 저장하므로 실제 PDF여야 한다
+    assert r.content.startswith(b"%PDF"), r.content[:20]
 
 
 def test_download_keeps_serving_its_own_result(api, two_maskings):

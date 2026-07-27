@@ -45,4 +45,14 @@ export async function maskDocument(analysisId, target, excludeIds) {
   return response.data;
 }
 
+// 마스킹된 문서(PDF) 내려받기.
+// JSON이 아니라 파일이 오므로 blob으로 받는다.
+export async function downloadMaskedDocument(resultId) {
+  const response = await api.get(`/download/${resultId}`, {
+    responseType: "blob",
+  });
+
+  return response.data;
+}
+
 export default api;
