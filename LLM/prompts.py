@@ -1,4 +1,4 @@
-from backend.app.schemas import DetectedItem, Target
+from app.schemas import DetectedItem, Target
 
 
 SYSTEM_DETECTION = """

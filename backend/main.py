@@ -1,8 +1,10 @@
-import os, shutil, uuid
+import logging, os, shutil, uuid
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.schemas import MaskRequest, MaskResponse, MaskingPolicy, Basis
+from app.schemas import DetectedItem, MaskRequest, MaskResponse, MaskingPolicy, Basis
+
+logger = logging.getLogger("garim")
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
@@ -14,7 +16,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 # 분석 결과 저장소 (MVP: 메모리)
 ANALYSES: dict = {}
 
-# 공유 대상별 기본 정책 (LLM 붙기 전 임시 규칙)
+# 공유 대상별 기본 정책 (LLM 호출 실패 시 폴백으로 사용)
 DEFAULT_RULES = {
     "internal":  {"name": "keep",   "phone": "keep",    "address": "keep",
                   "account": "keep", "business_no": "keep", "resident_no": "partial"},
@@ -50,30 +52,56 @@ async def analyze(file: UploadFile = File(...)):
     ANALYSES[data["analysis_id"]] = {"result": data, "file_path": path}
     return data
 
+def rule_based_policy(item: dict, target: str) -> MaskingPolicy:
+    """LLM을 못 쓸 때 사용하는 규칙 기반 정책."""
+    action = DEFAULT_RULES[target].get(item["type"], "remove")
+    return MaskingPolicy(
+        item_id=item["id"],
+        action=action,
+        masked_value=mask_value(item["type"], item["value"]) if action == "partial" else None,
+        basis=Basis(
+            doc="개인정보보호법",
+            clause="제17조(개인정보의 제공)",
+            summary=f"{target} 공유 기준에 따라 {item['type']} 항목을 {action} 처리",
+        ),
+    )
+
 @app.post("/mask", response_model=MaskResponse)
 def mask(req: MaskRequest):
     saved = ANALYSES.get(req.analysis_id)
     if not saved:
         raise HTTPException(status_code=404, detail="analysis_id not found")
 
-    rules = DEFAULT_RULES[req.target]
+    # LLM/RAG는 외부 API와 DB에 의존한다. 최상단에서 import하면 그쪽 장애가
+    # 서비스 기동 자체를 막으므로 analyze와 같이 요청 시점에 가져온다.
+    try:
+        from LLM.reasoning import generate_policy
+    except Exception as e:
+        logger.warning("LLM 모듈 로드 실패, 규칙 기반으로 대체: %s", e)
+        generate_policy = None
+
     policies, counts = [], {"keep": 0, "partial": 0, "remove": 0}
+    fallback_count = 0
 
     for item in saved["result"]["items"]:
         if item["id"] in req.exclude_ids:
             continue
-        action = rules.get(item["type"], "remove")
-        counts[action] += 1
-        policies.append(MaskingPolicy(
-            item_id=item["id"],
-            action=action,
-            masked_value=mask_value(item["type"], item["value"]) if action == "partial" else None,
-            basis=Basis(
-                doc="개인정보보호법",
-                clause="제17조(개인정보의 제공)",
-                summary=f"{req.target} 공유 기준에 따라 {item['type']} 항목을 {action} 처리",
-            ),
-        ))
+
+        policy = None
+        if generate_policy is not None:
+            try:
+                policy = generate_policy(DetectedItem.model_validate(item), req.target)
+                # LLM이 item_id를 잘못 채우면 프론트의 항목 매칭이 조용히 깨진다
+                policy.item_id = item["id"]
+            except Exception as e:
+                logger.warning("item %s 정책 생성 실패, 규칙 기반으로 대체: %s", item["id"], e)
+
+        if policy is None:
+            policy = rule_based_policy(item, req.target)
+            fallback_count += 1
+
+        counts[policy.action] += 1
+        policies.append(policy)
 
     result_id = str(uuid.uuid4())
     saved["policies"] = policies
@@ -82,5 +110,7 @@ def mask(req: MaskRequest):
 
     summary = (f"{req.target} 기준 총 {len(policies)}건: "
                f"keep {counts['keep']}건, partial {counts['partial']}건, remove {counts['remove']}건")
+    if fallback_count:
+        summary += f" (LLM 실패 {fallback_count}건은 기본 규칙 적용)"
     return MaskResponse(result_id=result_id, target=req.target,
                         policies=policies, summary=summary)
