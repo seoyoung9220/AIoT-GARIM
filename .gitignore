@@ -1,0 +1,27 @@
+# 환경변수·비밀키
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Node / React
+node_modules/
+dist/
+build/
+
+# 업로드 파일 (개인정보 포함)
+uploads/
+outputs/
+
+# OS·에디터
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
