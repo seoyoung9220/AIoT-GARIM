@@ -5,7 +5,7 @@ import psycopg2
 from dotenv import load_dotenv
 from pgvector.psycopg2 import register_vector
 
-from embedding import get_embedding
+from .embedding import get_embedding
 
 
 # ============================================================
