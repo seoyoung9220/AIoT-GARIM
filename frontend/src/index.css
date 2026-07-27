@@ -1,0 +1,25 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: #f4f6f8;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: #f4f6f8;
+  color: #111827;
+  font-family:
+    Arial,
+    "Noto Sans KR",
+    sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
