@@ -10,10 +10,51 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 from app.schemas import DetectedItem, MaskingPolicy
 from app.pdf_to_image import pdf_to_images
+
+# PIL 기본 폰트는 한글 글리프가 없어서 "김*수"가 두부(□*□)로 찍힌다.
+# partial 마스킹 값은 대부분 이름이라 한글 폰트가 사실상 필수다.
+_FONT_PATH = Path(__file__).resolve().parent.parent / "assets" / "NanumGothic-Regular.ttf"
+_MIN_FONT_SIZE = 8
+_font_cache: dict[int, ImageFont.ImageFont] = {}
+
+
+def _load_font(size: int) -> ImageFont.ImageFont:
+    size = max(size, _MIN_FONT_SIZE)
+    if size not in _font_cache:
+        try:
+            _font_cache[size] = ImageFont.truetype(str(_FONT_PATH), size)
+        except OSError:
+            # 폰트 파일이 없어도 마스킹 자체는 계속돼야 한다 (한글은 깨진 채로 나감).
+            try:
+                _font_cache[size] = ImageFont.load_default(size)
+            except TypeError:  # 구버전 Pillow는 크기 지정을 지원하지 않음
+                _font_cache[size] = ImageFont.load_default()
+    return _font_cache[size]
+
+
+def _text_width(font: ImageFont.ImageFont, text: str) -> int:
+    left, _, right, _ = font.getbbox(text)
+    return right - left
+
+
+def _fit_font(text: str, box_width: int, box_height: int) -> ImageFont.ImageFont:
+    """마스킹 값이 bbox 안에 들어가도록 글자 크기를 맞춘다.
+
+    기본 폰트를 그대로 쓰면 크기가 약 11px로 고정돼서, OCR 글자 높이(보통 40px 이상)
+    대비 지나치게 작게 찍힌다. 박스 높이에 맞춰 키우되 가로로 넘치면 줄인다.
+    """
+    size = int(box_height * 0.8)
+    font = _load_font(size)
+    width = _text_width(font, text)
+
+    if width > box_width and width > 0:
+        font = _load_font(int(size * box_width / width))
+
+    return font
 
 
 def _draw_mask(draw: ImageDraw.ImageDraw, item: DetectedItem, policy: MaskingPolicy) -> None:
@@ -29,7 +70,14 @@ def _draw_mask(draw: ImageDraw.ImageDraw, item: DetectedItem, policy: MaskingPol
     if policy.action == "partial":
         draw.rectangle([x1, y1, x2, y2], fill="white", outline="gray")
         text = policy.masked_value or "*" * len(item.value)
-        draw.text((x1, y1), text, fill="black")
+
+        font = _fit_font(text, x2 - x1, y2 - y1)
+
+        if isinstance(font, ImageFont.FreeTypeFont):
+            # anchor="lm" = 왼쪽 기준 세로 중앙. TrueType에서만 지원된다.
+            draw.text((x1 + 2, (y1 + y2) // 2), text, fill="black", font=font, anchor="lm")
+        else:
+            draw.text((x1 + 2, y1), text, fill="black", font=font)
 
 
 def render_masked_pages(
