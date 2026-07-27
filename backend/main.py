@@ -1,8 +1,10 @@
 import logging, os, shutil, uuid
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from app.schemas import DetectedItem, MaskRequest, MaskResponse, MaskingPolicy, Basis
+from app.render import render_analysis
 
 logger = logging.getLogger("garim")
 
@@ -13,8 +15,17 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"],
 UPLOAD_DIR = "/opt/garim/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+OUTPUT_DIR = "/opt/garim/outputs"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 # 분석 결과 저장소 (MVP: 메모리)
 ANALYSES: dict = {}
+
+# 마스킹 결과 저장소. ANALYSES와 반드시 분리한다.
+# 같은 문서를 대상만 바꿔 여러 번 마스킹할 수 있는데, 두 저장소를 섞으면
+# 나중 마스킹이 앞선 result_id의 결과 파일까지 덮어써서, 공개용으로 받아간
+# 다운로드 링크가 내부용(개인정보가 덜 가려진) 파일을 내려주게 된다.
+MASK_RESULTS: dict = {}
 
 # 공유 대상별 기본 정책 (LLM 호출 실패 시 폴백으로 사용)
 DEFAULT_RULES = {
@@ -82,6 +93,7 @@ def mask(req: MaskRequest):
 
     policies, counts = [], {"keep": 0, "partial": 0, "remove": 0}
     fallback_count = 0
+    included_items = []  # 마스킹 렌더링에 쓸, exclude 안 된 항목들
 
     for item in saved["result"]["items"]:
         if item["id"] in req.exclude_ids:
@@ -102,11 +114,30 @@ def mask(req: MaskRequest):
 
         counts[policy.action] += 1
         policies.append(policy)
+        included_items.append(DetectedItem.model_validate(item))
 
     result_id = str(uuid.uuid4())
-    saved["policies"] = policies
-    saved["target"] = req.target
-    ANALYSES[result_id] = saved
+
+    # 실제 마스킹 파일 생성. 실패해도 정책 응답 자체는 정상 반환한다.
+    output_path = os.path.join(OUTPUT_DIR, f"{result_id}.pdf")
+    try:
+        render_analysis(
+            original_file_path=saved["file_path"],
+            items=included_items,
+            policies=policies,
+            output_pdf_path=output_path,
+        )
+    except Exception as e:
+        logger.warning("마스킹 파일 생성 실패: %s", e)
+        output_path = None
+
+    # ANALYSES(분석 결과)는 읽기만 하고, 마스킹 결과는 별도 저장소에 담는다.
+    MASK_RESULTS[result_id] = {
+        "analysis_id": req.analysis_id,
+        "target": req.target,
+        "policies": policies,
+        "output_path": output_path,
+    }
 
     summary = (f"{req.target} 기준 총 {len(policies)}건: "
                f"keep {counts['keep']}건, partial {counts['partial']}건, remove {counts['remove']}건")
@@ -114,3 +145,12 @@ def mask(req: MaskRequest):
         summary += f" (LLM 실패 {fallback_count}건은 기본 규칙 적용)"
     return MaskResponse(result_id=result_id, target=req.target,
                         policies=policies, summary=summary)
+
+
+@app.get("/download/{result_id}")
+def download(result_id: str):
+    saved = MASK_RESULTS.get(result_id)
+    if not saved or not saved["output_path"] or not os.path.exists(saved["output_path"]):
+        raise HTTPException(status_code=404, detail="마스킹된 파일을 찾을 수 없습니다")
+    return FileResponse(saved["output_path"], media_type="application/pdf",
+                        filename="masked_result.pdf")
