@@ -19,6 +19,7 @@ def analyze_document(file_path: str, output_dir: str = "output_images") -> Analy
     if ext == ".pdf":
         pages_info = pdf_to_images(file_path, output_dir)
     else:
+        # 이미지 파일 하나짜리 문서는 1페이지로 취급
         from PIL import Image
         width, height = Image.open(file_path).size
         pages_info = [{"page": 1, "image_path": file_path, "width": width, "height": height}]
@@ -53,8 +54,9 @@ def analyze_images(image_paths: list[str], filename: str = "contract") -> Analyz
         width, height = Image.open(image_path).size
         ocr_page = run_ocr_on_image(image_path, page=page_number, width=width, height=height)
         ocr_pages.append(ocr_page)
-        all_items.extend(detect_pii(ocr_page))
-        print(f"[완료] {page_number}페이지({image_path}): 탐지 {len(detect_pii(ocr_page))}건")
+        detected = detect_pii(ocr_page)
+        all_items.extend(detected)
+        print(f"[완료] {page_number}페이지({image_path}): 탐지 {len(detected)}건")
 
     return AnalyzeResponse(
         analysis_id=str(uuid.uuid4()),
@@ -66,7 +68,7 @@ def analyze_images(image_paths: list[str], filename: str = "contract") -> Analyz
 
 
 if __name__ == "__main__":
-    result = analyze_images(["contract.jpg", "contract2.jpg"])
+    result = analyze_images(["app/contract.jpg", "app/contract2.jpg"])
     print(f"\n총 페이지: {result.page_count}, 총 탐지 건수: {len(result.items)}")
     for item in result.items:
         print(f" - [{item.type}] {item.value}  (page {item.page}, bbox: {item.bbox})")
