@@ -10,6 +10,13 @@ from pdf2image import convert_from_path
 
 
 def pdf_to_images(pdf_path: str, output_dir: str, dpi: int = 200) -> list[dict]:
+    """PDF를 페이지별 PNG로 저장하고 페이지 정보 리스트를 반환한다.
+
+    주의: 파일명이 page_1.png, page_2.png ... 로 고정이므로 output_dir은
+    "문서 한 건당 하나"여야 한다. 여러 요청이 같은 폴더를 공유하면 서로의
+    페이지 이미지를 덮어써서 다른 문서의 내용이 섞인다.
+    호출자(analyze_document)가 analysis_id별 폴더를 만들어 넘긴다.
+    """
     # 출력 폴더 없으면 생성
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
