@@ -8,7 +8,7 @@ CLOVA OCR은 텍스트를 단어 단위로 쪼개서 반환하기 때문에, 전
 import re
 import uuid
 
-from schemas import OcrPage, DetectedItem
+from app.schemas import OcrPage, DetectedItem
 
 # 하이픈(-)뿐 아니라 공백으로 구분된 경우도 잡도록 [-\s] 사용
 PATTERNS = {
@@ -96,14 +96,14 @@ def detect_pii(ocr_page: OcrPage) -> list[DetectedItem]:
 
 if __name__ == "__main__":
     from PIL import Image
-    from ocr import run_ocr_on_image
+    from app.ocr import run_ocr_on_image
 
-    image_path = "contract.jpg"
-    width, height = Image.open(image_path).size
+    for image_path in ["app/contract.jpg", "app/contract2.jpg"]:
+        width, height = Image.open(image_path).size
+        ocr_page = run_ocr_on_image(image_path, page=1, width=width, height=height)
+        detected = detect_pii(ocr_page)
 
-    ocr_page = run_ocr_on_image(image_path, page=1, width=width, height=height)
-    detected = detect_pii(ocr_page)
-
-    print(f"탐지된 개인정보 후보: {len(detected)}건")
-    for item in detected:
-        print(f" - [{item.type}] {item.value}  (bbox: {item.bbox})")
+        print(f"\n=== {image_path} ===")
+        print(f"탐지된 개인정보 후보: {len(detected)}건")
+        for item in detected:
+            print(f" - [{item.type}] {item.value}  (bbox: {item.bbox})")
