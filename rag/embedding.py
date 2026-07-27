@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 # .env 파일 읽기
 load_dotenv()
 
-API_KEY = os.getenv("CLOVA_API_KEY")
+API_KEY = os.getenv("CLOVA_STUDIO_KEY")
 
 MODEL_NAME = "clir-emb-dolphin"
 
