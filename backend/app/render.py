@@ -12,6 +12,12 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+# PIL은 RGB 이미지를 PDF로 저장할 때 내부적으로 JPEG 인코더를 쓰는데, 플러그인이
+# 아직 등록되지 않은 상태면 KeyError('JPEG')로 실패한다. 서버를 새로 띄운 직후
+# 들어온 첫 /mask 요청이 정확히 그 상태라서, 여기서 명시적으로 import해 등록을
+# 보장한다. (pytest 안에서는 PIL이 미리 초기화돼 있어 드러나지 않는다)
+from PIL import JpegImagePlugin  # noqa: F401
+
 from app.schemas import DetectedItem, MaskingPolicy
 from app.pdf_to_image import pdf_to_images
 

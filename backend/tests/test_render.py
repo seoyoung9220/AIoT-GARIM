@@ -2,7 +2,10 @@
 
 import glob
 import os
+import subprocess
+import sys
 import tempfile
+import textwrap
 import threading
 from pathlib import Path
 
@@ -126,6 +129,45 @@ def test_single_image_input(tmp_path):
     assert (tmp_path / "out.pdf").exists()
     # 원본 파일은 건드리지 않는다 (마스킹은 메모리 사본에만)
     assert Image.open(src).convert("RGB").getpixel((60, 60)) == fakes.color_of("B", 1)
+
+
+def test_pdf_save_works_in_a_fresh_process(tmp_path):
+    """PIL이 초기화되지 않은 상태에서도 PDF 저장이 되어야 한다.
+
+    PIL은 RGB 이미지를 PDF로 저장할 때 JPEG 인코더를 쓰는데, 플러그인이 아직
+    등록되기 전이면 KeyError('JPEG')로 실패한다. 서버를 새로 띄운 직후 첫
+    /mask 요청이 정확히 이 상태다.
+
+    pytest 프로세스는 이미 PIL이 초기화돼 있어 이 문제가 드러나지 않으므로,
+    깨끗한 인터프리터를 따로 띄워서 확인한다.
+    """
+    page = tmp_path / "page.png"
+    Image.new("RGB", (200, 120), "white").save(page)
+    out = tmp_path / "masked.pdf"
+
+    script = textwrap.dedent(f"""
+        import sys, types
+        sys.path.insert(0, {str(Path(__file__).resolve().parent.parent)!r})
+        fake = types.ModuleType("pdf2image")
+        fake.convert_from_path = lambda *a, **k: []
+        sys.modules["pdf2image"] = fake
+
+        from app.render import render_masked_pages
+        from app.schemas import Basis, DetectedItem, MaskingPolicy
+
+        items = [DetectedItem(id="i", type="phone", value="010-1234-5678",
+                              page=1, bbox=[10, 10, 150, 60], source="regex")]
+        policies = [MaskingPolicy(item_id="i", action="remove",
+                                  basis=Basis(doc="d", clause="c", summary="s"))]
+
+        render_masked_pages([{str(page)!r}], items, policies, {str(out)!r})
+    """)
+
+    result = subprocess.run([sys.executable, "-c", script],
+                            capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr[-800:]
+    assert out.exists() and out.read_bytes().startswith(b"%PDF")
 
 
 # ------------------------------------------------------------- 마스킹 그리기
