@@ -1,6 +1,6 @@
 import json
 
-from retriever import search_policy
+from .retriever import search_policy
 
 
 # ============================================================
