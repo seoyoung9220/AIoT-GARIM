@@ -1,0 +1,13 @@
+# 서버 구동에는 필요 없고, 테스트와 데이터 구축에만 쓰는 패키지
+#   pip install -r requirements-dev.txt
+
+-r requirements.txt
+
+# --- 테스트 (backend/tests) ---
+pytest>=8.0
+# fastapi의 TestClient가 내부적으로 사용한다
+httpx>=0.27
+
+# --- RAG 데이터 구축 (rag/scripts) ---
+# 정책 PDF를 청크로 쪼갤 때만 쓴다. 서버 구동에는 불필요하다.
+PyMuPDF>=1.24
