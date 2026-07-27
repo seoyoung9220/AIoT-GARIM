@@ -10,7 +10,7 @@ from .prompts import (
     build_detection_prompt,
     build_policy_prompt,
 )
-from backend.app.schemas import (
+from app.schemas import (
     DetectedItem,
     MaskingPolicy,
     Target,
