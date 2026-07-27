@@ -5,10 +5,10 @@
 import uuid
 from pathlib import Path
 
-from pdf_to_image import pdf_to_images
-from ocr import run_ocr_on_image
-from detect import detect_pii
-from schemas import AnalyzeResponse
+from app.pdf_to_image import pdf_to_images
+from app.ocr import run_ocr_on_image
+from app.detect import detect_pii
+from app.schemas import AnalyzeResponse
 
 
 def analyze_document(file_path: str, output_dir: str = "output_images") -> AnalyzeResponse:

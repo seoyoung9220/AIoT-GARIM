@@ -13,7 +13,7 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-from schemas import OcrField, OcrPage
+from app.schemas import OcrField, OcrPage
 
 load_dotenv()
 OCR_URL = os.getenv("OCR_INVOKE_URL")

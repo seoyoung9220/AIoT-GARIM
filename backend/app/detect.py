@@ -3,7 +3,7 @@
 import re
 import uuid
 
-from schemas import OcrPage, DetectedItem
+from app.schemas import OcrPage, DetectedItem
 
 # 값 형태로 바로 판별 가능한 것들 (문맥 없이 패턴만으로 탐지)
 PATTERNS = {
