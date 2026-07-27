@@ -1,0 +1,141 @@
+{
+  "policy_metadata": {
+    "policy_id": "GARIM-INTERNAL-001",
+    "title": "GARIM 가상 사내 문서 공유 보안정책",
+    "version": "1.0",
+    "source_type": "internal_policy",
+    "is_simulated": true,
+    "description": "GARIM 프로젝트의 RAG 및 마스킹 정책 판단 시연을 위한 가상 사내정책"
+  },
+  "policies": [
+    {
+      "policy_id": "GARIM-NAME-INTERNAL",
+      "pii_type": "name",
+      "target": "internal",
+      "action": "keep",
+      "reason": "내부 업무 수행에 필요한 개인 식별정보이므로 유지한다."
+    },
+    {
+      "policy_id": "GARIM-NAME-PARTNER",
+      "pii_type": "name",
+      "target": "partner",
+      "action": "keep",
+      "reason": "협력 업무에서 담당자 식별이 필요한 경우 이름을 유지한다."
+    },
+    {
+      "policy_id": "GARIM-NAME-PUBLIC",
+      "pii_type": "name",
+      "target": "public",
+      "action": "remove",
+      "reason": "외부 공개 문서에서는 개인 식별 가능성을 낮추기 위해 이름을 제거한다."
+    },
+    {
+      "policy_id": "GARIM-PHONE-INTERNAL",
+      "pii_type": "phone",
+      "target": "internal",
+      "action": "keep",
+      "reason": "내부 업무 연락에 필요한 전화번호는 유지한다."
+    },
+    {
+      "policy_id": "GARIM-PHONE-PARTNER",
+      "pii_type": "phone",
+      "target": "partner",
+      "action": "partial",
+      "masked_value_example": "010-****-5678",
+      "reason": "협력사 공유 시 업무상 연락 가능성은 유지하되 불필요한 전체 번호 노출을 줄이기 위해 부분 마스킹한다."
+    },
+    {
+      "policy_id": "GARIM-PHONE-PUBLIC",
+      "pii_type": "phone",
+      "target": "public",
+      "action": "remove",
+      "reason": "외부 공개 시 개인 연락처 노출을 방지하기 위해 전화번호를 제거한다."
+    },
+    {
+      "policy_id": "GARIM-ADDRESS-INTERNAL",
+      "pii_type": "address",
+      "target": "internal",
+      "action": "keep",
+      "reason": "업무상 필요한 내부 문서에서는 권한이 있는 구성원에게 주소 정보를 유지할 수 있다."
+    },
+    {
+      "policy_id": "GARIM-ADDRESS-PARTNER",
+      "pii_type": "address",
+      "target": "partner",
+      "action": "partial",
+      "masked_value_example": "서울특별시 강남구 ******",
+      "reason": "협력 업무에 필요한 범위의 지역 정보만 남기고 상세 주소는 부분 마스킹한다."
+    },
+    {
+      "policy_id": "GARIM-ADDRESS-PUBLIC",
+      "pii_type": "address",
+      "target": "public",
+      "action": "remove",
+      "reason": "외부 공개 시 개인의 거주지 등을 특정할 수 있는 주소 정보는 제거한다."
+    },
+    {
+      "policy_id": "GARIM-ACCOUNT-INTERNAL",
+      "pii_type": "account",
+      "target": "internal",
+      "action": "partial",
+      "masked_value_example": "110-***-******",
+      "reason": "금융정보는 내부 공유에서도 불필요한 전체 노출을 줄이기 위해 부분 마스킹한다."
+    },
+    {
+      "policy_id": "GARIM-ACCOUNT-PARTNER",
+      "pii_type": "account",
+      "target": "partner",
+      "action": "remove",
+      "reason": "협력 업무에 명시적으로 필요하지 않은 개인 금융정보는 제거한다."
+    },
+    {
+      "policy_id": "GARIM-ACCOUNT-PUBLIC",
+      "pii_type": "account",
+      "target": "public",
+      "action": "remove",
+      "reason": "외부 공개 문서에서는 개인 금융정보를 제거한다."
+    },
+    {
+      "policy_id": "GARIM-BUSINESS-NO-INTERNAL",
+      "pii_type": "business_no",
+      "target": "internal",
+      "action": "keep",
+      "reason": "거래처 및 계약 상대방 확인에 필요한 사업자등록번호는 유지한다."
+    },
+    {
+      "policy_id": "GARIM-BUSINESS-NO-PARTNER",
+      "pii_type": "business_no",
+      "target": "partner",
+      "action": "keep",
+      "reason": "계약 및 거래 관계 확인을 위해 사업자등록번호를 유지한다."
+    },
+    {
+      "policy_id": "GARIM-BUSINESS-NO-PUBLIC",
+      "pii_type": "business_no",
+      "target": "public",
+      "action": "keep",
+      "reason": "본 가상 사내정책에서는 사업자 식별을 위한 정보로 분류하여 유지한다."
+    },
+    {
+      "policy_id": "GARIM-RESIDENT-NO-INTERNAL",
+      "pii_type": "resident_no",
+      "target": "internal",
+      "action": "remove",
+      "reason": "일반적인 내부 문서 공유 과정에서 주민등록번호 전체 노출은 허용하지 않는다."
+    },
+    {
+      "policy_id": "GARIM-RESIDENT-NO-PARTNER",
+      "pii_type": "resident_no",
+      "target": "partner",
+      "action": "remove",
+      "reason": "협력사 공유 문서에서는 주민등록번호를 제거한다."
+    },
+    {
+      "policy_id": "GARIM-RESIDENT-NO-PUBLIC",
+      "pii_type": "resident_no",
+      "target": "public",
+      "action": "remove",
+      "reason": "외부 공개 문서에서는 주민등록번호를 제거한다."
+    }
+  ]
+}
