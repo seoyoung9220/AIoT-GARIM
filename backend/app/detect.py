@@ -11,9 +11,11 @@ import uuid
 from app.schemas import OcrPage, DetectedItem
 
 # 하이픈(-)뿐 아니라 공백으로 구분된 경우도 잡도록 [-\s] 사용.
-# CLOVA OCR이 "-"를 별도 필드로 쪼개면 "010 - 1234"처럼 구분자가 여러 글자가 될 수 있어 {1,3}으로 허용.
+# {1,3}: OCR이 하이픈까지 별도 필드로 쪼개면 "010" / "-" / "1234"처럼 되어
+# 병합 시 구분자가 " - "(공백+하이픈+공백, 3글자)가 될 수 있어 길이를 넉넉히 허용한다.
+# phone: 휴대폰(01x)뿐 아니라 유선전화(02, 031 등 지역번호)도 잡는다.
 PATTERNS = {
-    "phone": re.compile(r"01[016789][-\s]{1,3}\d{3,4}[-\s]{1,3}\d{4}"),
+    "phone": re.compile(r"(01[016789]|0[2-6]\d?)[-\s]{1,3}\d{3,4}[-\s]{1,3}\d{4}"),
     "business_no": re.compile(r"\d{3}[-\s]{1,3}\d{2}[-\s]{1,3}\d{5}"),
     "resident_no": re.compile(r"\d{6}[-\s]{1,3}\d{7}"),
 }
@@ -86,8 +88,7 @@ def detect_pii(ocr_page: OcrPage) -> list[DetectedItem]:
                 items.append(DetectedItem(
                     id=str(uuid.uuid4()),
                     type=pii_type,
-                    # main.py의 부분마스킹(mask_value)이 "-" 단일 구분자를 기준으로 split하므로 정규화
-                    value=re.sub(r"[-\s]+", "-", match.group()),
+                    value=re.sub(r"[\s-]+", "-", match.group()),  # 공백/하이픈 혼재 -> 하이픈으로 통일
                     page=ocr_page.page,
                     bbox=_bbox_union(covering_fields),
                     source="regex",
