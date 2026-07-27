@@ -6,6 +6,8 @@ analyze_pipeline.analyze_document()가 반환하는 AnalyzeResponse에는 원본
 방식으로 페이지 이미지를 준비한 뒤 마스킹을 그린다.
 """
 
+import shutil
+import tempfile
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -68,21 +70,32 @@ def render_analysis(
     items: list[DetectedItem],
     policies: list[MaskingPolicy],
     output_pdf_path: str,
-    image_output_dir: str = "output_images",
+    image_output_dir: str | None = None,
 ) -> str:
     """/mask가 호출할 최종 진입점.
 
     analyze_document()에 넣었던 원본 파일 경로(original_file_path)를 그대로 다시 받아서,
     그때와 똑같은 방식(PDF면 페이지 분리, 이미지면 그대로)으로 페이지 이미지를 준비한 뒤
-    마스킹을 그린다. 이렇게 하면 원본 파일만 어딘가(ANALYSES 딕셔너리 등)에 저장해두면 되고,
-    페이지 이미지를 별도로 영구 보관할 필요가 없다.
+    마스킹을 그린다. 이렇게 하면 원본 파일만 어딘가(ANALYSES 딕셔너리 등)에 저장해두면 된다.
+
+    image_output_dir: 페이지 이미지를 풀어놓을 폴더. pdf_to_images가 page_1.png 라는
+        고정 이름을 쓰기 때문에 "문서 한 건당 하나"여야 한다. 여러 요청이 같은 폴더를
+        공유하면 서로의 페이지를 덮어써서, 남의 계약서 페이지가 섞인 PDF가 나간다.
+        생략하면 이번 호출 전용 임시 폴더를 만들어 쓰고 끝나면 지운다.
     """
     ext = Path(original_file_path).suffix.lower()
 
-    if ext == ".pdf":
-        pages_info = pdf_to_images(original_file_path, image_output_dir)
-        image_paths = [p["image_path"] for p in pages_info]
-    else:
-        image_paths = [original_file_path]
+    if ext != ".pdf":
+        return render_masked_pages([original_file_path], items, policies, output_pdf_path)
 
-    return render_masked_pages(image_paths, items, policies, output_pdf_path)
+    # 페이지 이미지는 PDF를 만들기 위한 중간 산출물이라 남길 이유가 없다.
+    # 개인정보가 담긴 이미지를 디스크에 방치하지 않도록 다 쓰면 지운다.
+    temp_dir = tempfile.mkdtemp(prefix="garim_render_") if image_output_dir is None else None
+
+    try:
+        pages_info = pdf_to_images(original_file_path, temp_dir or image_output_dir)
+        image_paths = [p["image_path"] for p in pages_info]
+        return render_masked_pages(image_paths, items, policies, output_pdf_path)
+    finally:
+        if temp_dir:
+            shutil.rmtree(temp_dir, ignore_errors=True)
