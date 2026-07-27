@@ -1,6 +1,6 @@
 from typing import List
 
-from backend.app.schemas import (
+from app.schemas import (
     DetectedItem,
     MaskingPolicy,
     Target,
