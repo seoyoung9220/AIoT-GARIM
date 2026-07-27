@@ -1,4 +1,4 @@
-from schemas import DetectedItem, Target
+from backend.app.schemas import DetectedItem, Target
 
 
 SYSTEM_DETECTION = """
@@ -9,8 +9,10 @@ SYSTEM_DETECTION = """
 1. 이름(name)과 주소(address)만 탐지합니다.
 2. 전화번호, 주민등록번호, 사업자등록번호, 계좌번호는 무시합니다.
 3. OCR 오류를 고려하여 의미를 판단합니다.
-4. JSON 배열만 출력합니다.
-5. 설명은 절대 출력하지 않습니다.
+4. 반드시 JSON 배열만 출력합니다.
+5. 설명, 주석, 서론, 결론은 절대 출력하지 않습니다.
+6. Markdown 코드블록(``` 또는 ```json)을 절대 사용하지 않습니다.
+7. JSON 이외의 어떠한 문자도 출력하지 않습니다.
 
 출력 형식:
 
@@ -46,7 +48,10 @@ action은 아래 중 하나만 사용합니다.
 
 partial인 경우에는 반드시 masked_value를 생성합니다.
 
-출력은 JSON 하나만 반환합니다.
+반드시 JSON 객체 하나만 출력합니다.
+Markdown 코드블록(``` 또는 ```json)을 절대 사용하지 않습니다.
+설명, 주석, 서론, 결론은 출력하지 않습니다.
+JSON 이외의 어떠한 문자도 출력하지 않습니다.
 
 {
   "item_id": "...",

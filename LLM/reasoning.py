@@ -1,12 +1,12 @@
 from typing import List
 
-from schemas import (
+from backend.app.schemas import (
     DetectedItem,
     MaskingPolicy,
     Target,
 )
 
-from llm_client import ClovaClient
+from .llm_client import ClovaClient
 from rag.rag_pipeline import run_rag
 
 

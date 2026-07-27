@@ -2,12 +2,15 @@ import json
 import os
 
 import requests
+from dotenv import load_dotenv
 
-from prompts import (
+load_dotenv()
+
+from .prompts import (
     build_detection_prompt,
     build_policy_prompt,
 )
-from schemas import (
+from backend.app.schemas import (
     DetectedItem,
     MaskingPolicy,
     Target,
@@ -28,8 +31,7 @@ class ClovaClient:
         self.session = requests.Session()
 
         self.headers = {
-            "Authorization": f"Bearer {os.getenv('HCX_API_KEY')}",
-            "X-NCP-CLOVASTUDIO-REQUEST-ID": os.getenv("HCX_REQUEST_ID"),
+            "Authorization": f"Bearer {os.getenv('CLOVA_STUDIO_KEY')}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
@@ -66,6 +68,16 @@ class ClovaClient:
             raise RuntimeError(result)
 
         content = result["result"]["message"]["content"]
+
+        if content.startswith("```json"):
+            content = content[len("```json"):]
+        elif content.startswith("```"):
+            content = content[len("```"):]
+            
+        if content.endswith("```"):
+            content = content[:-3]
+
+        content = content.strip()
 
         return json.loads(content)
 
