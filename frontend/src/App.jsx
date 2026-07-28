@@ -220,6 +220,11 @@ function App() {
     try {
       setError("");
       setAnalysisResult(null);
+      // 이전 마스킹 결과는 방금 지운 분석 결과에 딸린 것이라 같이 비운다.
+      // 남겨두면 분석이 끝나기 전까지 "분석 결과는 없는데 마스킹 결과만 있는"
+      // 상태가 되어, 결과 표가 사라진 항목을 참조하다 화면이 통째로 죽는다.
+      setMaskResult(null);
+      setExcludedIds([]);
       setUploadProgress(0);
       setIsAnalyzing(true);
 
@@ -568,7 +573,8 @@ function App() {
         </section>
       )}
 
-      {maskResult && (
+      {/* 아래에서 analysisResult.items를 참조하므로 둘 다 있을 때만 그린다 */}
+      {maskResult && analysisResult && (
         <section className="card">
           <h2>마스킹 결과</h2>
           <p>{maskResult.summary}</p>
@@ -586,7 +592,7 @@ function App() {
               </thead>
               <tbody>
                 {maskResult.policies.map((policy) => {
-                  const item = analysisResult.items.find(
+                  const item = analysisResult.items?.find(
                     ({ id }) => id === policy.item_id
                   );
                   return (
