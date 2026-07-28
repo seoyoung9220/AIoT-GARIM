@@ -108,7 +108,10 @@ def render_masked_pages(
         processed_images.append(image)
 
     processed_images[0].save(
-        output_pdf_path, save_all=True, append_images=processed_images[1:]
+        output_pdf_path,
+        save_all=True,
+        append_images=processed_images[1:],
+        resolution=200,
     )
     return output_pdf_path
 
