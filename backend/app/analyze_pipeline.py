@@ -2,7 +2,6 @@
 백엔드는 이 파일의 analyze_document() 함수 하나만 호출하면 된다.
 """
 
-import os
 import sys
 import uuid
 from pathlib import Path
@@ -13,10 +12,6 @@ from pathlib import Path
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
-
-# 페이지 이미지 저장 위치. 상대경로로 두면 서버를 어느 폴더에서 띄웠는지에 따라
-# 저장 위치가 달라지므로 프로젝트 루트 기준 절대경로로 고정한다.
-OUTPUT_ROOT = Path(os.getenv("GARIM_OUTPUT_DIR") or (_PROJECT_ROOT / "output_images"))
 
 from app.pdf_to_image import pdf_to_images
 from app.ocr import run_ocr_on_image
@@ -55,6 +50,9 @@ def _detect_llm_items(ocr_page) -> list[DetectedItem]:
             continue
         raw.bbox = bbox
         raw.page = ocr_page.page
+        # LLM이 스스로 매긴 id(예: "1","2")는 페이지마다 다시 1부터 매겨져서
+        # 서로 다른 항목끼리 같은 id를 갖는 충돌이 생긴다. 신뢰하지 않고 새로 발급한다.
+        raw.id = str(uuid.uuid4())
         filled.append(raw)
 
     return filled
@@ -67,30 +65,13 @@ def _detect_all(ocr_page) -> list[DetectedItem]:
     return items
 
 
-def page_image_path(analysis_id: str, page: int, output_dir: str | None = None) -> Path:
-    """analysis_id와 페이지 번호만으로 페이지 이미지 경로를 되돌린다.
-
-    PDF 문서의 페이지 이미지는 analyze_document가 아래 규칙으로 저장하므로,
-    나중에 페이지 이미지를 서빙하는 엔드포인트도 이 함수 하나만 쓰면 된다.
-    (이미지 파일을 업로드한 경우엔 페이지 이미지를 따로 만들지 않으므로 없음)
-    """
-    base = Path(output_dir) if output_dir else OUTPUT_ROOT
-    return base / analysis_id / f"page_{page}.png"
-
-
-def analyze_document(file_path: str, output_dir: str | None = None) -> AnalyzeResponse:
+def analyze_document(file_path: str, output_dir: str = "output_images") -> AnalyzeResponse:
     """PDF 또는 이미지 파일 경로를 받아 AnalyzeResponse를 반환한다."""
 
     ext = Path(file_path).suffix.lower()
 
-    # 페이지 이미지 파일명(page_1.png ...)이 문서마다 같기 때문에, 요청들이 같은
-    # 폴더를 쓰면 동시에 업로드했을 때 서로의 페이지를 덮어쓴다.
-    # analysis_id를 먼저 만들어 문서 전용 폴더를 쓰게 한다.
-    analysis_id = str(uuid.uuid4())
-
     if ext == ".pdf":
-        base = Path(output_dir) if output_dir else OUTPUT_ROOT
-        pages_info = pdf_to_images(file_path, str(base / analysis_id))
+        pages_info = pdf_to_images(file_path, output_dir)
     else:
         # 이미지 파일 하나짜리 문서는 1페이지로 취급
         from PIL import Image
@@ -106,7 +87,7 @@ def analyze_document(file_path: str, output_dir: str | None = None) -> AnalyzeRe
         all_items.extend(_detect_all(ocr_page))
 
     return AnalyzeResponse(
-        analysis_id=analysis_id,
+        analysis_id=str(uuid.uuid4()),
         filename=Path(file_path).name,
         page_count=len(ocr_pages),
         items=all_items,
