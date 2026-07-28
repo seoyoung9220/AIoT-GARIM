@@ -17,6 +17,12 @@ URL = (
 )
 
 
+# (연결 대기, 응답 대기) 초. 타임아웃이 없으면 API가 응답을 주지 않을 때
+# 요청 스레드가 무한정 묶여서, 마스킹 항목 수만큼 스레드가 잠기면 서버 전체가 멈춘다.
+# 연결은 짧게 끊어 서버가 아예 안 뜰 때 빨리 실패하게 하고, 응답은 넉넉히 준다.
+TIMEOUT = (5, 30)
+
+
 def get_embedding(text):
 
     headers = {
@@ -31,7 +37,8 @@ def get_embedding(text):
     response = requests.post(
         URL,
         headers=headers,
-        json=data
+        json=data,
+        timeout=TIMEOUT
     )
 
     # 오류 발생 시 확인하기 쉽게 출력
