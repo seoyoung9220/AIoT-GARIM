@@ -52,7 +52,13 @@ def health():
     return {"status": "ok", "service": "garim"}
 
 @app.post("/analyze")
-async def analyze(file: UploadFile = File(...)):
+def analyze(file: UploadFile = File(...)):
+    """OCR/LLM 호출이 전부 동기라서 async가 아닌 일반 함수로 둔다.
+
+    async def 안에서 await 없이 동기 호출을 하면 그 시간 동안 이벤트 루프가
+    통째로 멈춰서, 분석이 끝날 때까지 /health 같은 다른 요청도 응답하지 못한다.
+    일반 def로 두면 FastAPI가 스레드풀에서 돌려주므로 다른 요청이 계속 처리된다.
+    """
     from app.analyze_pipeline import analyze_document
     path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}_{file.filename}")
     with open(path, "wb") as f:
