@@ -1,0 +1,32 @@
+# GARIM 서버 구동에 필요한 패키지
+#   pip install -r requirements.txt
+#
+# pip로 설치되지 않는 것이 하나 있다. PDF를 페이지 이미지로 바꾸는 데
+# poppler가 필요하다 (pdf2image가 내부에서 호출한다).
+#   Ubuntu/Debian : sudo apt install poppler-utils
+#   macOS         : brew install poppler
+#   Windows       : poppler 바이너리를 받아 PATH에 추가
+# 이게 없으면 PDF 업로드 시 /analyze가 500으로 떨어진다.
+
+# --- 웹 서버 ---
+fastapi>=0.110
+uvicorn[standard]>=0.27
+# UploadFile(멀티파트 업로드) 파싱에 필요하다. 코드에서 직접 import하지
+# 않아서 빠뜨리기 쉽고, 없으면 /analyze가 500이 난다.
+python-multipart>=0.0.9
+
+# --- 공용 스키마 ---
+# model_validate / model_dump 를 쓰므로 v2 이상이어야 한다.
+pydantic>=2.0
+
+# --- 문서 처리 ---
+pillow>=10.0
+pdf2image>=1.17
+
+# --- 외부 API 호출 (CLOVA OCR / HCX / 임베딩) ---
+requests>=2.31
+python-dotenv>=1.0
+
+# --- RAG (pgvector 기반 정책 검색) ---
+psycopg2-binary>=2.9
+pgvector>=0.2
