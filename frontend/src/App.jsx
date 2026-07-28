@@ -1,9 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  analyzeDocument,
-  downloadMaskedDocument,
-  maskDocument,
-} from "./api";
+import { analyzeDocument, downloadResult, maskDocument } from "./api";
 import "./App.css";
 
 const ALLOWED_MIME_TYPES = [
@@ -267,60 +263,20 @@ function App() {
     }
   }
 
-  // 다운로드는 응답을 blob으로 받기 때문에, 에러가 나도 본문이 Blob으로 온다.
-  // 그대로 두면 서버가 보낸 메시지를 못 읽으므로 텍스트로 풀어서 확인한다.
-  async function getDownloadErrorMessage(requestError) {
-    const data = requestError.response?.data;
-
-    if (data instanceof Blob) {
-      try {
-        const { detail } = JSON.parse(await data.text());
-
-        if (typeof detail === "string") {
-          return detail;
-        }
-      } catch {
-        // JSON이 아니면 아래 기본 메시지로 넘어간다
-      }
-    }
-
-    if (requestError.code === "ERR_NETWORK") {
-      return "백엔드 서버에 연결할 수 없습니다. 서버 실행 상태와 CORS 설정을 확인해주세요.";
-    }
-
-    return "마스킹된 문서를 내려받지 못했습니다.";
-  }
-
-  function maskedFileName() {
-    const original = analysisResult?.filename || "document";
-    return `${original.replace(/\.[^.]+$/, "")}_masked.pdf`;
-  }
-
   async function handleDownload() {
-    let objectUrl = "";
-
     try {
       setError("");
       setIsDownloading(true);
-
-      const blob = await downloadMaskedDocument(maskResult.result_id);
-
-      objectUrl = URL.createObjectURL(blob);
-
+      const blob = await downloadResult(maskResult.result_id);
+      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = objectUrl;
-      link.download = maskedFileName();
-      document.body.appendChild(link);
+      link.href = url;
+      link.download = `garim-${maskResult.result_id}.pdf`;
       link.click();
-      link.remove();
+      URL.revokeObjectURL(url);
     } catch (requestError) {
-      console.error("마스킹 문서 다운로드 오류:", requestError);
-      setError(await getDownloadErrorMessage(requestError));
+      setError(getRequestErrorMessage(requestError));
     } finally {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-
       setIsDownloading(false);
     }
   }
@@ -616,16 +572,6 @@ function App() {
         <section className="card">
           <h2>마스킹 결과</h2>
           <p>{maskResult.summary}</p>
-
-          <button
-            type="button"
-            className="analyze-button"
-            onClick={handleDownload}
-            disabled={isDownloading}
-          >
-            {isDownloading ? "내려받는 중..." : "마스킹된 문서 내려받기"}
-          </button>
-
           <div className="result-table-wrapper">
             <table className="result-table">
               <thead>
@@ -665,6 +611,14 @@ function App() {
               </tbody>
             </table>
           </div>
+          <button
+            type="button"
+            className="analyze-button"
+            onClick={handleDownload}
+            disabled={isDownloading}
+          >
+            {isDownloading ? "다운로드 중..." : "마스킹 PDF 다운로드"}
+          </button>
         </section>
       )}
     </main>
