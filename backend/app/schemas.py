@@ -12,6 +12,12 @@ Action = Literal["keep", "partial", "remove"]
 Source = Literal["regex", "llm"]
 
 
+class HealthResponse(BaseModel):
+    """헬스체크 응답. 배포 검증·모니터링이 이 형태를 파싱한다."""
+    status: str
+    service: str
+
+
 class OcrField(BaseModel):
     """OCR로 읽은 텍스트 한 조각과 그 위치."""
     text: str

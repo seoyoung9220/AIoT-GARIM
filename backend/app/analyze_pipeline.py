@@ -2,10 +2,13 @@
 백엔드는 이 파일의 analyze_document() 함수 하나만 호출하면 된다.
 """
 
+import logging
 import os
 import sys
 import uuid
 from pathlib import Path
+
+logger = logging.getLogger("garim")
 
 # LLM/, rag/ 폴더는 backend/ 밖에 있어서, 서버의 PYTHONPATH 설정과 무관하게
 # 항상 import가 되도록 프로젝트 루트를 직접 sys.path에 추가한다.
@@ -22,6 +25,7 @@ from app.pdf_to_image import pdf_to_images
 from app.ocr import run_ocr_on_image
 from app.detect import detect_pii
 from app.bbox_matcher import find_bbox
+from app.log_safe import exc_label, mask_for_log
 from app.schemas import AnalyzeResponse, DetectedItem
 
 try:
@@ -29,7 +33,8 @@ try:
     _llm_client = ClovaClient()
 except Exception as e:  # noqa: BLE001
     # LLM 모듈이 아직 준비 안 됐거나 키가 없어도, 정규식 탐지만으로는 서비스가 죽지 않게 한다.
-    print(f"[경고] LLM 모듈 로드 실패, 이름/주소 탐지는 건너뜁니다: {e}")
+    # 이 시점의 예외는 import/설정 오류라 문서 내용과 무관하므로 메시지를 그대로 남긴다.
+    logger.warning("LLM 모듈 로드 실패, 이름/주소 탐지는 건너뜁니다: %s", e)
     _llm_client = None
 
 
@@ -43,21 +48,28 @@ def _detect_llm_items(ocr_page) -> list[DetectedItem]:
     try:
         raw_items = _llm_client.detect_pii_llm(page_text)
     except Exception as e:  # noqa: BLE001
-        print(f"[경고] LLM 탐지 호출 실패, 이 페이지는 이름/주소 없이 진행합니다: {e}")
+        # str(e)를 찍으면 안 된다. 응답 파싱 실패 예외에는 LLM이 뱉은 이름/주소가
+        # 그대로 들어있어서, 실패 로그를 통해 개인정보가 샌다.
+        logger.warning("LLM 탐지 호출 실패, 이 페이지는 이름/주소 없이 진행합니다: %s",
+                       exc_label(e))
         return []
 
     used = set()
     filled = []
     for raw in raw_items:
+        # LLM이 스스로 매긴 id(예: "1","2")는 페이지마다 다시 1부터 매겨져서
+        # 서로 다른 항목끼리 같은 id를 갖는 충돌이 생긴다. 신뢰하지 않고 새로 발급한다.
+        # 매칭 실패 로그에 추적 가능한 id를 남기려면 bbox 탐색보다 먼저 발급해야 한다.
+        raw.id = str(uuid.uuid4())
+
         bbox, used = find_bbox(raw.value, ocr_page, used)
         if bbox is None:
-            print(f"[bbox 매칭 실패] {raw.type}={raw.value} (건너뜀)")
+            # 탐지값(이름·주소) 자체는 남기지 않는다. type과 id만으로 추적한다.
+            logger.warning("bbox 매칭 실패로 항목 제외: type=%s item_id=%s page=%s",
+                           raw.type, raw.id, ocr_page.page)
             continue
         raw.bbox = bbox
         raw.page = ocr_page.page
-        # LLM이 스스로 매긴 id(예: "1","2")는 페이지마다 다시 1부터 매겨져서
-        # 서로 다른 항목끼리 같은 id를 갖는 충돌이 생긴다. 신뢰하지 않고 새로 발급한다.
-        raw.id = str(uuid.uuid4())
         filled.append(raw)
 
     return filled
@@ -132,7 +144,7 @@ def analyze_images(image_paths: list[str], filename: str = "contract") -> Analyz
         ocr_pages.append(ocr_page)
         detected = _detect_all(ocr_page)
         all_items.extend(detected)
-        print(f"[완료] {page_number}페이지({image_path}): 탐지 {len(detected)}건")
+        logger.info("%s페이지 분석 완료: 탐지 %d건", page_number, len(detected))
 
     return AnalyzeResponse(
         analysis_id=str(uuid.uuid4()),
@@ -147,4 +159,6 @@ if __name__ == "__main__":
     result = analyze_images(["app/contract.jpg", "app/contract2.jpg"])
     print(f"\n총 페이지: {result.page_count}, 총 탐지 건수: {len(result.items)}")
     for item in result.items:
-        print(f" - [{item.type}] {item.value}  (page {item.page}, bbox: {item.bbox}, source: {item.source})")
+        # 로컬 확인용 출력이라도 탐지값을 그대로 찍지 않는다 (터미널 기록·캡처로 남는다)
+        print(f" - [{item.type}] {mask_for_log(item.value)}  "
+              f"(page {item.page}, bbox: {item.bbox}, source: {item.source})")

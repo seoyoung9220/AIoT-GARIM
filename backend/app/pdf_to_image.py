@@ -5,8 +5,12 @@
 - poppler 설치 필요 (Mac: brew install poppler / Windows: 별도 설치)
 """
 
+import logging
 from pathlib import Path
+
 from pdf2image import convert_from_path
+
+logger = logging.getLogger("garim")
 
 
 def pdf_to_images(pdf_path: str, output_dir: str, dpi: int = 200) -> list[dict]:
@@ -36,7 +40,7 @@ def pdf_to_images(pdf_path: str, output_dir: str, dpi: int = 200) -> list[dict]:
             "width": width,
             "height": height,
         })
-        print(f"[완료] {page_number}페이지 -> {save_path} ({width}x{height})")
+        logger.info("PDF 변환: %s페이지 (%dx%d)", page_number, width, height)
 
     return results
 

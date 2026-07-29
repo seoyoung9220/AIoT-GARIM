@@ -99,6 +99,7 @@ def detect_pii(ocr_page: OcrPage) -> list[DetectedItem]:
 
 if __name__ == "__main__":
     from PIL import Image
+    from app.log_safe import mask_for_log
     from app.ocr import run_ocr_on_image
 
     for image_path in ["app/contract.jpg", "app/contract2.jpg"]:
@@ -109,4 +110,5 @@ if __name__ == "__main__":
         print(f"\n=== {image_path} ===")
         print(f"탐지된 개인정보 후보: {len(detected)}건")
         for item in detected:
-            print(f" - [{item.type}] {item.value}  (bbox: {item.bbox})")
+            # 로컬 확인용이라도 탐지값을 그대로 찍지 않는다
+            print(f" - [{item.type}] {mask_for_log(item.value)}  (bbox: {item.bbox})")

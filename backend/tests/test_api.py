@@ -1,7 +1,9 @@
 """FastAPI 엔드포인트 (/health, /analyze, /mask, /download)."""
 
+import os
 import sys
 import threading
+import time
 import types
 
 import pytest
@@ -68,6 +70,69 @@ def test_analyze_saves_page_images(analyzed, doc):
 
 def test_uploads_are_stored(api, analyzed):
     assert len(list(api.uploads.glob("*.pdf"))) >= len(fakes.DOCS)
+
+
+# ------------------------------------------------------- /analyze 입력 검증
+
+@pytest.mark.parametrize("filename", ["악성.exe", "문서.hwp", "확장자없음"])
+def test_analyze_rejects_unsupported_extension(api, filename):
+    """프론트에서 걸러도 브라우저 단이라 우회가 가능하므로 서버가 다시 막는다."""
+    r = api.client.post("/analyze", files={"file": (filename, b"MZ\x00", "application/pdf")})
+
+    assert r.status_code == 415, r.text[:200]
+    assert not list(api.uploads.glob(f"*{filename}"))
+
+
+def test_analyze_rejects_oversized_file(api, monkeypatch):
+    monkeypatch.setattr(api.main, "MAX_UPLOAD_BYTES", 1024)
+
+    r = api.client.post(
+        "/analyze",
+        files={"file": ("big.pdf", b"%PDF-1.4" + b"x" * 4096, "application/pdf")},
+    )
+
+    assert r.status_code == 413, r.text[:200]
+    # 제한을 넘겨 거부한 업로드가 디스크에 남으면 정리되지 않는 개인정보가 된다
+    assert not list(api.uploads.glob("*big.pdf"))
+
+
+def test_analyze_strips_path_from_filename(api):
+    """파일명에 경로 구분자가 섞여도 저장 위치는 UPLOAD_DIR 안이어야 한다."""
+    r = api.client.post(
+        "/analyze",
+        files={"file": ("../../A.pdf", b"%PDF-1.4 fake", "application/pdf")},
+    )
+
+    assert r.status_code == 200, r.text[:200]
+    assert not (api.uploads.parent.parent / "A.pdf").exists()
+    assert [p for p in api.uploads.glob("*_A.pdf")]
+
+
+# --------------------------------------------------------------- 파일 정리
+
+def test_cleanup_removes_only_expired_files(api, tmp_path):
+    old_file, fresh_file = tmp_path / "old.pdf", tmp_path / "fresh.pdf"
+    old_dir = tmp_path / "old_pages"
+    old_file.write_bytes(b"x")
+    fresh_file.write_bytes(b"x")
+    old_dir.mkdir()
+    (old_dir / "page_1.png").write_bytes(b"x")
+
+    stale = time.time() - 25 * 3600
+    for target in (old_file, old_dir):
+        os.utime(target, (stale, stale))
+
+    removed = api.main.cleanup_old_files([str(tmp_path)], max_age_hours=24)
+
+    assert removed == 2
+    assert not old_file.exists()
+    assert not old_dir.exists()  # 페이지 이미지 폴더도 통째로 지운다
+    assert fresh_file.exists()
+
+
+def test_cleanup_survives_missing_directory(api):
+    """정리 실패가 서버 기동을 막으면 안 된다."""
+    assert api.main.cleanup_old_files([str(api.uploads / "없는폴더")]) == 0
 
 
 # ------------------------------------------------------------------ /mask

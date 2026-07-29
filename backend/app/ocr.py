@@ -5,6 +5,7 @@ CLOVA 원본 응답 구조는 이 파일 밖으로 나가지 않는다 (detect/r
 """
 
 import json
+import logging
 import os
 import time
 import uuid
@@ -14,6 +15,8 @@ import requests
 from dotenv import load_dotenv
 
 from app.schemas import OcrField, OcrPage
+
+logger = logging.getLogger("garim")
 
 load_dotenv()
 OCR_URL = os.getenv("OCR_INVOKE_URL")
@@ -88,7 +91,7 @@ def run_ocr_on_pdf(pdf_path: str, image_output_dir: str) -> list[OcrPage]:
     for info in pages_info:
         ocr_page = run_ocr_on_image(info["image_path"], info["page"], info["width"], info["height"])
         ocr_pages.append(ocr_page)
-        print(f"[OCR 완료] {info['page']}페이지: 텍스트 조각 {len(ocr_page.fields)}개 인식")
+        logger.info("OCR 완료: %s페이지, 텍스트 조각 %d개", info["page"], len(ocr_page.fields))
 
     return ocr_pages
 
@@ -101,6 +104,8 @@ if __name__ == "__main__":
 
     ocr_page = run_ocr_on_image(image_path, page=1, width=width, height=height)
 
+    # OCR 원문은 문서 전체를 그대로 담고 있어(= 개인정보 원본) 출력하지 않는다.
+    # 인식 품질 확인에는 조각 수와 좌표 분포만 있으면 충분하다.
     print(f"인식된 텍스트 조각 수: {len(ocr_page.fields)}")
     for field in ocr_page.fields:
-        print(f" - {field.text}  (bbox: {field.bbox})")
+        print(f" - {len(field.text)}자  (bbox: {field.bbox})")
